@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Phase 0 scope: lint + typecheck (+ backend tests) for both apps.
+# Deploy is handled by Railway/Vercel git integration (documented in the operator checklist);
+# a deploy gate on `main` is added in Phase 7 (P7.9).
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (lint · typecheck · test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/fastapi-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Ruff (lint)
+        run: uv run ruff check app tests
+
+      - name: Black (format check)
+        run: uv run black --check app tests
+
+      - name: Mypy (typecheck)
+        run: uv run mypy app
+
+      - name: Pytest
+        run: uv run pytest
+
+  frontend:
+    name: Frontend (lint · typecheck · build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/nextjs-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: frontend/nextjs-app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: ESLint
+        run: pnpm lint
+
+      - name: Prettier (format check)
+        run: pnpm format:check
+
+      - name: TypeScript (typecheck)
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build

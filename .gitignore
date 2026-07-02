@@ -1,0 +1,50 @@
+# ---------- OS / editor ----------
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# ---------- Secrets / env ----------
+.env
+.env.*
+!.env.example
+*.local
+
+# ---------- Python (backend) ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# ---------- Node / Next.js (frontend) ----------
+node_modules/
+.next/
+out/
+.turbo/
+.pnpm-store/
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+next-env.d.ts
+
+# ---------- Build / deploy ----------
+.vercel/
+.railway/
+
+# ---------- Misc ----------
+*.log
+coverage/

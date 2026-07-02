@@ -1,0 +1,60 @@
+# Pre-commit hooks — run formatters/linters before each commit.
+# Install once:  pre-commit install
+# Run on demand: pre-commit run --all-files
+minimum_pre_commit_version: "3.5.0"
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: detect-private-key
+
+  # ---- Backend: ruff (lint + import sort) and black (format) ----
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+        files: ^backend/fastapi-app/
+      - id: ruff-format
+        files: ^backend/fastapi-app/
+
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+        files: ^backend/fastapi-app/
+
+  # ---- Backend: mypy (type check) ----
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        files: ^backend/fastapi-app/app/
+        additional_dependencies:
+          - pydantic
+          - pydantic-settings
+
+  # ---- Frontend: eslint + prettier via local pnpm ----
+  - repo: local
+    hooks:
+      - id: frontend-lint
+        name: frontend eslint
+        entry: bash -c 'cd frontend/nextjs-app && pnpm run lint'
+        language: system
+        files: ^frontend/nextjs-app/.*\.(ts|tsx|js|jsx)$
+        pass_filenames: false
+      - id: frontend-format
+        name: frontend prettier (check)
+        entry: bash -c 'cd frontend/nextjs-app && pnpm run format:check'
+        language: system
+        files: ^frontend/nextjs-app/.*\.(ts|tsx|js|jsx|json|css|md)$
+        pass_filenames: false
