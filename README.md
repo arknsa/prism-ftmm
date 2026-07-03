@@ -1,15 +1,7 @@
-<p align="center">
-  <img src="docs/assets/banner.png" width="100%" alt="PRISM Banner">
-</p>
-
-<h1 align="center">PRISM</h1>
+<h1 align="center">PRISM - Professional Relationship Intelligence & Statistics Manager</h1>
 
 <p align="center">
-<b>Professional Relationship Intelligence & Statistics Manager</b>
-</p>
-
-<p align="center">
-Modern Alumni Intelligence Platform for Higher Education
+<b>Modern Alumni Intelligence Platform for Higher Education</b>
 </p>
 
 <p align="center">
