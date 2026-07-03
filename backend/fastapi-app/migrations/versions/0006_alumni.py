@@ -22,8 +22,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-revision: str = "0006_alumni"
-down_revision: str | None = "0005_company"
+revision: str = "0006"
+down_revision: str | None = "0005"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

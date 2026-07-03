@@ -18,8 +18,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
-revision: str = "0004_security_tables"
-down_revision: str | None = "0003_refresh_snapshot"
+revision: str = "0004"
+down_revision: str | None = "0003"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

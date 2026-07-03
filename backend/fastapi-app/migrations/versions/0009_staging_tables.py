@@ -35,8 +35,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
 
-revision: str = "0009_staging_tables"
-down_revision: str | None = "0008_career_record_indexes_constraints"
+revision: str = "0009"
+down_revision: str | None = "0008"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

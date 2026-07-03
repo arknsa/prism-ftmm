@@ -18,8 +18,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0002_reference_tables"
-down_revision: str | None = "0001_baseline"
+revision: str = "0002"
+down_revision: str | None = "0001"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
