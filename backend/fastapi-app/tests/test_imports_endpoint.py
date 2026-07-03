@@ -268,7 +268,7 @@ class TestImportHappyPath:
         batch = next(o for o in added_objects if isinstance(o, ImportBatch))
         assert batch.created_by == _CURATOR.user_id
 
-    def test_staging_rows_added_to_session(self) -> None:
+    def test_staging_rows_bulk_inserted(self) -> None:
         session = _make_session()
         client = TestClient(_app_with(_CURATOR, session))
         client.post(
@@ -276,9 +276,15 @@ class TestImportHappyPath:
             data={"source_type": "LinkedIn", "source_id": "3"},
             files={"file": ("linkedin.csv", io.BytesIO(_LINKEDIN_CSV), "text/csv")},
         )
-        added_objects = [c.args[0] for c in session.add.call_args_list]
-        rows = [o for o in added_objects if isinstance(o, StagingRow)]
-        assert len(rows) == 1
+        # Staging rows are written via a single bulk execute, not per-row add.
+        assert not any(isinstance(c.args[0], StagingRow) for c in session.add.call_args_list)
+        bulk_calls = [
+            c
+            for c in session.execute.call_args_list
+            if len(c.args) >= 2 and isinstance(c.args[1], list)
+        ]
+        assert len(bulk_calls) == 1
+        assert len(bulk_calls[0].args[1]) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -466,6 +472,88 @@ class TestGetBatchRows:
         client = TestClient(_app_with(_CURATOR, session))
         response = client.get("/api/v1/imports/1/rows?page_size=300")
         assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# GET /api/v1/imports — list batches (paginated, filterable)
+# ---------------------------------------------------------------------------
+
+
+class TestListBatches:
+    def _make_batch(
+        self, batch_id: int = 1, source_id: int = 3, status_: str = "complete"
+    ) -> ImportBatch:
+        import datetime
+
+        b = ImportBatch(
+            source_id=source_id,
+            filename=f"batch{batch_id}.csv",
+            total_rows=2,
+            parsed_rows=2,
+            error_rows=0,
+            status=status_,
+            created_by=5,
+        )
+        b.batch_id = batch_id
+        b.created_at = datetime.datetime(2026, 7, 1, tzinfo=datetime.UTC)
+        return b
+
+    def _session_with(self, batches: list[ImportBatch]) -> MagicMock:
+        session = _make_session()
+        session.scalar.return_value = len(batches)
+        session.scalars.return_value.all.return_value = batches
+        return session
+
+    def test_returns_200_for_curator(self) -> None:
+        session = self._session_with([self._make_batch()])
+        client = TestClient(_app_with(_CURATOR, session))
+        assert client.get("/api/v1/imports").status_code == 200
+
+    def test_read_only_forbidden(self) -> None:
+        session = self._session_with([])
+        client = TestClient(_app_with(_READ_ONLY, session))
+        assert client.get("/api/v1/imports").status_code == 403
+
+    def test_unauthenticated_401(self) -> None:
+        client = TestClient(_app_401())
+        assert client.get("/api/v1/imports").status_code == 401
+
+    def test_response_has_pagination_fields(self) -> None:
+        session = self._session_with([self._make_batch()])
+        client = TestClient(_app_with(_CURATOR, session))
+        body = client.get("/api/v1/imports").json()
+        assert {"total", "page", "page_size", "items"}.issubset(body.keys())
+
+    def test_default_pagination_values(self) -> None:
+        session = self._session_with([])
+        client = TestClient(_app_with(_CURATOR, session))
+        body = client.get("/api/v1/imports").json()
+        assert body["page"] == 1
+        assert body["page_size"] == 50
+
+    def test_items_contain_batches(self) -> None:
+        batches = [self._make_batch(1), self._make_batch(2)]
+        session = self._session_with(batches)
+        client = TestClient(_app_with(_CURATOR, session))
+        body = client.get("/api/v1/imports").json()
+        assert body["total"] == 2
+        assert len(body["items"]) == 2
+        assert {item["batch_id"] for item in body["items"]} == {1, 2}
+
+    def test_page_size_over_limit_422(self) -> None:
+        session = self._session_with([])
+        client = TestClient(_app_with(_CURATOR, session))
+        assert client.get("/api/v1/imports?page_size=300").status_code == 422
+
+    def test_status_filter_accepted(self) -> None:
+        session = self._session_with([self._make_batch(status_="failed")])
+        client = TestClient(_app_with(_CURATOR, session))
+        assert client.get("/api/v1/imports?status=failed").status_code == 200
+
+    def test_source_id_filter_accepted(self) -> None:
+        session = self._session_with([self._make_batch(source_id=7)])
+        client = TestClient(_app_with(_CURATOR, session))
+        assert client.get("/api/v1/imports?source_id=7").status_code == 200
 
 
 # ---------------------------------------------------------------------------

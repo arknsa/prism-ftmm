@@ -60,3 +60,12 @@ class PagedStagingRows(BaseModel):
     page: int
     page_size: int
     items: list[StagingRowOut]
+
+
+class PagedImportBatches(BaseModel):
+    """Paginated list of import batches (batch history)."""
+
+    total: int
+    page: int
+    page_size: int
+    items: list[BatchSummary]

@@ -84,7 +84,17 @@ def _xlsx_bytes(rows: list[dict[str, str]]) -> bytes:
 
 
 def _added_staging_rows(session: MagicMock) -> list[StagingRow]:
-    return [a.args[0] for a in session.add.call_args_list if isinstance(a.args[0], StagingRow)]
+    """Reconstruct staged rows from the bulk INSERT payload.
+
+    parse_import now writes staging rows via a single
+    ``session.execute(insert(StagingRow), [values, ...])`` call rather than
+    per-row ``session.add``. We rebuild StagingRow objects from the value dicts
+    so existing attribute-level assertions keep working unchanged.
+    """
+    for call in session.execute.call_args_list:
+        if len(call.args) >= 2 and isinstance(call.args[1], list):
+            return [StagingRow(**values) for values in call.args[1]]
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -752,3 +762,82 @@ class TestErrorCases:
         )
         assert batch.error_rows == 0
         assert _added_staging_rows(session)[0].raw_full_name == "X"
+
+
+# ---------------------------------------------------------------------------
+# Bulk staging insert (P3.2 optimization)
+# ---------------------------------------------------------------------------
+
+
+class TestBulkStagingInsert:
+    """Staging rows are written with a single bulk INSERT, not per-row session.add."""
+
+    def _rows(self, n: int) -> list[dict[str, str]]:
+        return [
+            {
+                "full_name": f"Person {i}",
+                "study_program": "Industrial Engineering",
+                "graduation_year": "2021",
+                "employer": "ACME",
+                "role_title": "Eng",
+                "location": "Jkt",
+            }
+            for i in range(n)
+        ]
+
+    def test_staging_rows_not_added_one_by_one(self) -> None:
+        session = _make_session()
+        parse_import(
+            file_content=_csv_bytes(self._rows(3)),
+            filename="bulk.csv",
+            source_type="LinkedIn",
+            source_id=3,
+            session=session,
+        )
+        added = [c.args[0] for c in session.add.call_args_list]
+        assert not any(isinstance(o, StagingRow) for o in added)
+
+    def test_staging_rows_inserted_in_single_bulk_execute(self) -> None:
+        session = _make_session()
+        parse_import(
+            file_content=_csv_bytes(self._rows(3)),
+            filename="bulk.csv",
+            source_type="LinkedIn",
+            source_id=3,
+            session=session,
+        )
+        bulk_calls = [
+            c
+            for c in session.execute.call_args_list
+            if len(c.args) >= 2 and isinstance(c.args[1], list)
+        ]
+        assert len(bulk_calls) == 1
+        assert len(bulk_calls[0].args[1]) == 3
+
+    def test_bulk_payload_preserves_row_data(self) -> None:
+        session = _make_session()
+        parse_import(
+            file_content=_csv_bytes(self._rows(2)),
+            filename="bulk.csv",
+            source_type="LinkedIn",
+            source_id=3,
+            session=session,
+        )
+        staged = _added_staging_rows(session)
+        assert [r.raw_full_name for r in staged] == ["Person 0", "Person 1"]
+
+    def test_empty_file_issues_no_bulk_insert(self) -> None:
+        session = _make_session()
+        parse_import(
+            file_content=b"full_name,study_program,graduation_year,employer,role_title,location\n",
+            filename="empty.csv",
+            source_type="LinkedIn",
+            source_id=3,
+            session=session,
+        )
+        bulk_calls = [
+            c
+            for c in session.execute.call_args_list
+            if len(c.args) >= 2 and isinstance(c.args[1], list)
+        ]
+        assert bulk_calls == []

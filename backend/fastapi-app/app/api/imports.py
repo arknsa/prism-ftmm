@@ -30,7 +30,12 @@ from app.dependencies.rbac import require_permission
 from app.models.staging import ImportBatch, StagingRow
 from app.rate_limiting import import_rate_limit
 from app.schemas.auth import AuthenticatedUser
-from app.schemas.imports import BatchSummary, PagedStagingRows, StagingRowOut
+from app.schemas.imports import (
+    BatchSummary,
+    PagedImportBatches,
+    PagedStagingRows,
+    StagingRowOut,
+)
 from app.services.audit import write_audit_entry
 from app.services.import_parser import SUPPORTED_SOURCES, parse_import
 
@@ -128,6 +133,53 @@ def run_import(
         user.user_id,
     )
     return BatchSummary.model_validate(batch)
+
+
+# ---------------------------------------------------------------------------
+# List — GET /api/v1/imports
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "",
+    response_model=PagedImportBatches,
+    summary="List import batches (paginated, filterable)",
+)
+def list_batches(
+    batch_status: Annotated[str | None, Query(alias="status")] = None,
+    source_id: Annotated[int | None, Query()] = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=200)] = 50,
+    _user: AuthenticatedUser = Depends(require_permission("import:run")),
+    session: Session = Depends(get_session),
+) -> PagedImportBatches:
+    """Return a paginated list of import batches, newest first.
+
+    Optional filters: ``status`` (``"pending"`` | ``"complete"`` | ``"failed"``)
+    and ``source_id``. Permission required: ``import:run``.
+    """
+    base_stmt = select(ImportBatch)
+    count_stmt = select(func.count()).select_from(ImportBatch)
+
+    if batch_status is not None:
+        base_stmt = base_stmt.where(ImportBatch.status == batch_status)
+        count_stmt = count_stmt.where(ImportBatch.status == batch_status)
+    if source_id is not None:
+        base_stmt = base_stmt.where(ImportBatch.source_id == source_id)
+        count_stmt = count_stmt.where(ImportBatch.source_id == source_id)
+
+    total = session.scalar(count_stmt) or 0
+    offset = (page - 1) * page_size
+    batches = session.scalars(
+        base_stmt.order_by(ImportBatch.batch_id.desc()).offset(offset).limit(page_size)
+    ).all()
+
+    return PagedImportBatches(
+        total=total,
+        page=page,
+        page_size=page_size,
+        items=[BatchSummary.model_validate(b) for b in batches],
+    )
 
 
 # ---------------------------------------------------------------------------

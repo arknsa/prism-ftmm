@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import openpyxl
+from sqlalchemy import insert
 from sqlalchemy.orm import Session
 
 from app.models.staging import ImportBatch, StagingRow
@@ -155,22 +156,28 @@ def parse_import(
     session.add(batch)
     session.flush()  # populate batch_id so FK is valid on staging rows
 
-    for p in parsed:
-        row = StagingRow(
-            batch_id=batch.batch_id,
-            row_number=p.row_number,
-            raw_full_name=p.raw_full_name,
-            raw_study_program=p.raw_study_program,
-            raw_graduation_year=p.raw_graduation_year,
-            raw_employer=p.raw_employer,
-            raw_role_title=p.raw_role_title,
-            raw_location=p.raw_location,
-            raw_linkedin_url=p.raw_linkedin_url,
-            raw_extra=p.raw_extra if p.raw_extra else None,
-            row_status=p.row_status,
-            row_error=p.row_error,
-        )
-        session.add(row)
+    # Bulk insert: one executemany statement for all staging rows instead of N
+    # per-row ORM adds. Staging rows are write-only here (no identity needed
+    # downstream), so a Core INSERT avoids unit-of-work overhead entirely.
+    staging_values = [
+        {
+            "batch_id": batch.batch_id,
+            "row_number": p.row_number,
+            "raw_full_name": p.raw_full_name,
+            "raw_study_program": p.raw_study_program,
+            "raw_graduation_year": p.raw_graduation_year,
+            "raw_employer": p.raw_employer,
+            "raw_role_title": p.raw_role_title,
+            "raw_location": p.raw_location,
+            "raw_linkedin_url": p.raw_linkedin_url,
+            "raw_extra": p.raw_extra if p.raw_extra else None,
+            "row_status": p.row_status,
+            "row_error": p.row_error,
+        }
+        for p in parsed
+    ]
+    if staging_values:
+        session.execute(insert(StagingRow), staging_values)
 
     logger.info(
         "import_parser: source=%r filename=%r total=%d parsed=%d errors=%d",

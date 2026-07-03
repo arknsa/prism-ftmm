@@ -91,10 +91,17 @@ class TestAtomicCommit:
         added_objects = [c.args[0] for c in session.add.call_args_list]
         types_added = [type(o).__name__ for o in added_objects]
 
-        # ImportBatch, StagingRow(s), and AuditLog must all appear before commit
+        # ImportBatch and AuditLog are added via the ORM; staging rows are written
+        # via a single bulk execute(insert(StagingRow), [...]). All must appear
+        # before commit.
         assert "ImportBatch" in types_added
-        assert "StagingRow" in types_added
         assert "AuditLog" in types_added
+        staging_bulk = [
+            c
+            for c in session.execute.call_args_list
+            if len(c.args) >= 2 and isinstance(c.args[1], list)
+        ]
+        assert len(staging_bulk) == 1
         session.commit.assert_called_once()
         session.rollback.assert_not_called()
 
