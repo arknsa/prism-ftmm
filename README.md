@@ -1,87 +1,238 @@
-# FTMM Alumni Intelligence Dashboard
+<p align="center">
+  <img src="docs/assets/banner.png" width="100%">
+</p>
 
-A centralized **analytics & reporting** dashboard for FTMM (Fakultas Teknologi Maju dan
-Multidisiplin), Universitas Airlangga. It consolidates fragmented alumni career data into a
-single source of truth and answers where alumni work, what roles/seniority they hold, which
-companies/industries employ them, where they are located, and how this varies by study program.
+<h1 align="center">
+PRISM
+</h1>
 
-> **Scope:** analytics & reporting only. See the explicit non-goals below.
+<p align="center">
 
-## Tech stack
+Professional Relationship Intelligence & Statistics Manager
 
-| Layer | Choice |
-|------|--------|
-| Frontend | Next.js (App Router) + TypeScript + TailwindCSS + Shadcn UI + ECharts |
-| Backend | FastAPI + SQLAlchemy + Alembic |
-| Database | PostgreSQL on Supabase |
-| Auth | Supabase Auth (authentication) + app-DB RBAC (authorization) |
-| Deploy | Frontend → Vercel · Backend → Railway · DB/Auth → Supabase |
+</p>
 
-## Monorepo layout (D-037)
+<p align="center">
+
+Modern Alumni Intelligence Platform
+
+</p>
+
+<p align="center">
+
+FastAPI • Next.js • PostgreSQL • Supabase
+
+</p>
+
+# PRISM
+
+> **Professional Relationship Intelligence & Statistics Manager**
+
+A modern Alumni Intelligence Platform for higher education institutions that transforms fragmented alumni records into a single source of truth through deterministic ETL, snapshot-based analytics, and interactive executive dashboards.
+
+Built as a portfolio-grade full-stack application using FastAPI, Next.js, PostgreSQL, and Supabase.
+
+---
+
+## Features
+
+### Analytics
+
+- Executive dashboard with alumni KPIs
+- Career outcomes by study program
+- Company and employer analytics
+- Industry & sector distribution
+- Geographic distribution
+- Graduation year trends
+- Snapshot comparison (Quarterly)
+
+### Data Curation
+
+- CSV/XLSX import
+- Deterministic validation pipeline
+- Company normalization
+- Role normalization
+- Seniority classification
+- Two-stage deduplication
+- Quarterly snapshot commit
+- Validation workflow
+- Full audit logging
+
+### Security
+
+- Supabase Authentication
+- Database-driven RBAC
+- JWT verification
+- Permission-based API authorization
+
+---
+
+## Tech Stack
+
+### Backend
+
+- FastAPI
+- SQLAlchemy
+- Alembic
+- PostgreSQL
+- Supabase
+
+### Frontend
+
+- Next.js
+- TypeScript
+- TailwindCSS
+- shadcn/ui
+- Apache ECharts
+
+### Infrastructure
+
+- Railway
+- Vercel
+- GitHub Actions
+
+---
+
+## Project Structure
 
 ```
-.
-├─ frontend/nextjs-app/      # Next.js App Router frontend
-├─ backend/fastapi-app/      # FastAPI single business-logic gateway
-├─ database/
-│  ├─ migrations/            # pointer to canonical Alembic versions
-│  └─ schema/                # schema docs / future ERD
-├─ docs/
-│  ├─ prd/                   # product requirements
-│  ├─ architecture/          # context, readiness, scope lock, roadmap, risks
-│  └─ decisions/             # DECISIONS.md (D-001–D-051) — the contract
-└─ scripts/
-   ├─ imports/               # import CLIs (later phases)
-   └─ maintenance/           # maintenance / synthetic-data tooling (later phases)
+prism/
+├── backend/
+│   └── fastapi-app/
+├── frontend/
+│   └── nextjs-app/
+├── database/
+├── docs/
+├── scripts/
+└── README.md
 ```
 
-> **Canonical migrations** live under `backend/fastapi-app/migrations/` (Alembic).
-> `database/migrations/` holds a pointer so the `database/` epic stays discoverable.
+---
 
-## Governance docs
+## Architecture
 
-The project is built strictly to its written contract:
+```
+                 CSV / XLSX
+                      │
+                      ▼
+             Import Pipeline
+                      │
+          Validation & Normalization
+                      │
+               Deduplication
+                      │
+            Snapshot Generation
+                      │
+                PostgreSQL
+                      │
+          FastAPI Analytics API
+                      │
+              Next.js Dashboard
+```
 
-- [docs/CLAUDE_CODE_HANDOFF.md](docs/CLAUDE_CODE_HANDOFF.md) — single-source implementation briefing.
-- [docs/decisions/DECISIONS.md](docs/decisions/DECISIONS.md) — decisions D-001–D-051 (authoritative).
-- [docs/architecture/IMPLEMENTATION_ROADMAP.md](docs/architecture/IMPLEMENTATION_ROADMAP.md) — phased roadmap.
-- [docs/architecture/PROJECT_CONTEXT.md](docs/architecture/PROJECT_CONTEXT.md) — product context.
-- [docs/PHASE0_EXECUTION_PLAN.md](docs/PHASE0_EXECUTION_PLAN.md) — current phase plan.
+---
 
-## Permanent non-goals (never built)
+## Requirements
 
-No AI/LLM/chatbot/RAG, no recommendation or confidence-scoring or predictive analytics, no
-AI/ML/fuzzy matching, no real-time sync/streaming, no microservices/event-driven/Kafka/CQRS,
-no Kubernetes/distributed systems. All matching, validation, and deduplication are
-**deterministic and curator-controlled**. Only `validated` alumni appear in analytics;
-employment is reported as **"Employed vs Not Reported"** (never an asserted unemployment rate).
-Development uses **synthetic data only** until legal preconditions (R-001/R-002) clear.
+### Backend
 
-## Local development
+- Python 3.12+
+- PostgreSQL
+- uv
 
-See per-app instructions:
+### Frontend
 
-- Backend: [backend/fastapi-app/README.md](backend/fastapi-app/README.md)
-- Frontend: [frontend/nextjs-app/README.md](frontend/nextjs-app/README.md)
+- Node.js 22+
+- pnpm
 
-Quick start (from repo root):
+---
+
+## Local Development
+
+### Backend
 
 ```bash
-# Backend
 cd backend/fastapi-app
-uv sync
-cp .env.example .env            # fill in values
-uv run uvicorn app.main:app --reload --port 8000   # GET http://localhost:8000/health
 
-# Frontend (separate terminal)
-cd frontend/nextjs-app
-pnpm install
-cp .env.example .env.local      # fill in values
-pnpm dev                        # http://localhost:3000
+uv sync
+
+cp .env.example .env
+
+uv run uvicorn app.main:app --reload
 ```
 
-## Project status
+### Frontend
 
-**Phase 0 — Foundations & Infrastructure Bootstrap.** An empty but deployable skeleton across
-Vercel + Railway + Supabase, with CI. No database models, auth, or dashboards yet — those arrive
-in later phases per the roadmap.
+```bash
+cd frontend/nextjs-app
+
+pnpm install
+
+cp .env.example .env.local
+
+pnpm dev
+```
+
+---
+
+## Deployment
+
+| Component | Platform |
+|----------|----------|
+| Frontend | Vercel |
+| Backend | Railway |
+| Database | Supabase |
+| Authentication | Supabase Auth |
+
+---
+
+## Testing
+
+Backend
+
+- Ruff
+- Black
+- MyPy (Strict)
+- Pytest
+
+Frontend
+
+- ESLint
+- TypeScript
+- Vitest
+- Next.js Production Build
+
+---
+
+## Project Status
+
+Current Status
+
+✅ MVP Complete
+
+Current Phase
+
+Phase 7 — Production Deployment
+
+---
+
+## Roadmap
+
+- [x] Foundations
+- [x] Database Schema
+- [x] Authentication
+- [x] RBAC
+- [x] Import Pipeline
+- [x] Validation
+- [x] Deduplication
+- [x] Snapshot Analytics
+- [x] Dashboard
+- [x] Documentation
+- [ ] Production Deployment
+- [ ] Live Demo
+
+---
+
+## License
+
+MIT

@@ -1,7 +1,8 @@
 # Backend — FastAPI
 
-Single business-logic gateway (D-031) for the FTMM Alumni Intelligence Dashboard. Phase 0
-exposes only `GET /health`. No models yet.
+Single business-logic gateway (D-031) for the FTMM Alumni Intelligence Dashboard. Exposes the
+import/commit/dedup/validation curator pipeline and the analytics API (`/api/v1/*`), plus
+auth/RBAC endpoints and `GET /health`. All ORM models live under `app/models/`.
 
 ## Requirements
 
@@ -17,7 +18,7 @@ cp .env.example .env    # fill in values (APP_ENV=local is enough to boot)
 
 uv run uvicorn app.main:app --reload --port 8000
 # -> http://localhost:8000/health
-# -> http://localhost:8000/docs
+# -> http://localhost:8000/docs   (OpenAPI: all curator + analytics routes)
 ```
 
 ## Quality gates
@@ -32,11 +33,11 @@ uv run pytest
 ## Migrations (Alembic)
 
 The DB URL is read from `DATABASE_URL` (Supabase **pooler**) at runtime — never stored in
-`alembic.ini`. Phase 0 ships one **empty baseline** migration.
+`alembic.ini`. The migration tree ships versions `0001`–`0009` (baseline → staging tables).
 
 ```bash
-uv run alembic upgrade head     # applies the empty baseline (requires DATABASE_URL)
-uv run alembic revision -m "msg"   # create a new migration (Phase 1+)
+uv run alembic upgrade head        # applies all migrations (requires DATABASE_URL)
+uv run alembic revision -m "msg"   # create a new migration
 ```
 
 The canonical migration tree is `migrations/`; `database/migrations/` at the repo root is a

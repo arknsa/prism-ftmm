@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     # --- Runtime ---
     app_env: AppEnv = Field(default="local", alias="APP_ENV")
     app_name: str = "FTMM Alumni Intelligence Dashboard API"
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
     # --- CORS: comma-separated list of allowed origins (Vercel URL in prod) ---
     backend_cors_origins: list[str] = Field(default_factory=list, alias="BACKEND_CORS_ORIGINS")

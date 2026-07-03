@@ -1,8 +1,8 @@
 """Alembic migration environment.
 
 The DB URL is taken from app settings (``DATABASE_URL``, the Supabase pooler) so no secret
-is stored in ``alembic.ini``. Phase 0 has no models, so ``target_metadata`` is the empty
-declarative ``Base.metadata`` — autogenerate will produce nothing until Phase 1.
+is stored in ``alembic.ini``. ``app.models`` is imported to register all mapped classes on
+``Base.metadata`` so autogenerate can diff the full schema.
 """
 
 from __future__ import annotations
@@ -14,13 +14,13 @@ from sqlalchemy import engine_from_config, pool
 
 from app.config import get_settings
 from app.db import Base, _normalize_url
+import app.models  # noqa: F401 — registers all mapped classes on Base.metadata
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# No models yet (Phase 0). Base.metadata is empty until Phase 1 adds models.
 target_metadata = Base.metadata
 
 

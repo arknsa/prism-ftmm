@@ -1,8 +1,8 @@
 """SQLAlchemy engine/session wiring for the Supabase Postgres pooler.
 
-Phase 0 has **no models** — this only establishes connectivity and the migration target.
 The engine is created lazily so the app can boot in environments without ``DATABASE_URL``
-(e.g. a bare health check before Supabase is provisioned).
+(e.g. a bare health check before Supabase is provisioned). All ORM models declare against
+the :class:`Base` defined here; migrations live under ``migrations/versions/``.
 """
 
 from __future__ import annotations
@@ -10,13 +10,14 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from sqlalchemy import Engine, create_engine, text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import get_settings
 
 
 class Base(DeclarativeBase):
-    """Declarative base. Models are added from Phase 1 onward."""
+    """Declarative base shared by all ORM models."""
 
 
 _engine: Engine | None = None
@@ -52,10 +53,11 @@ def get_engine() -> Engine:
 
 
 def get_session() -> Iterator[Session]:
-    """FastAPI dependency yielding a SQLAlchemy session (used from Phase 1 onward)."""
+    """FastAPI dependency yielding a SQLAlchemy session, closed after the request."""
     if _SessionLocal is None:
         get_engine()
-    assert _SessionLocal is not None
+    if _SessionLocal is None:  # pragma: no cover
+        raise RuntimeError("Session factory not initialised; call get_engine() first.")
     session = _SessionLocal()
     try:
         yield session
@@ -64,10 +66,14 @@ def get_session() -> Iterator[Session]:
 
 
 def ping() -> bool:
-    """Execute ``SELECT 1`` to confirm DB connectivity. Returns False if DB is unconfigured."""
+    """Execute ``SELECT 1`` to confirm DB connectivity. Returns False if DB is unconfigured
+    or unreachable; re-raises for unexpected non-connection errors."""
     settings = get_settings()
     if not settings.database_url:
         return False
-    with get_engine().connect() as conn:
-        conn.execute(text("SELECT 1"))
-    return True
+    try:
+        with get_engine().connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except (OperationalError, SQLAlchemyError):
+        return False
