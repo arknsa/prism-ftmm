@@ -5,7 +5,7 @@ directly; all access flows through this app.
 
 Routers registered per phase:
   Phase 0: /health
-  Phase 2: /me, /users
+  Phase 2: /auth (register, login, me), /me, /users
   Phase 3: /api/v1/imports
   Phase 4: /api/v1/dedup, /api/v1/snapshots, /api/v1/commit, /api/v1/companies
   Phase 5: /api/v1/analytics/* (filter-options, overview, career-outcomes, companies,
@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.analytics import router as analytics_router
+from app.api.auth import router as auth_router
 from app.api.commit import router as commit_router
 from app.api.company import router as company_router
 from app.api.dedup import router as dedup_router
@@ -58,6 +59,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     app.include_router(health_router)
+    app.include_router(auth_router)
     app.include_router(me_router)
     app.include_router(users_router)
     app.include_router(imports_router)

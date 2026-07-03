@@ -10,7 +10,7 @@ NEVER read from JWT claims; permissions are loaded exclusively from the DB.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class TokenClaims(BaseModel):
@@ -52,3 +52,33 @@ class AuthenticatedUser(BaseModel):
     )
 
     model_config = ConfigDict(frozen=True)
+
+
+class LoginRequest(BaseModel):
+    """Body for POST /auth/login. Credentials are forwarded to Supabase Auth."""
+
+    email: EmailStr = Field(..., description="Registered Supabase Auth email address.")
+    password: str = Field(
+        ...,
+        min_length=1,
+        description="Account password. Forwarded to Supabase; never stored in the app DB.",
+    )
+
+
+class LoginResponse(BaseModel):
+    """Response body for a successful POST /auth/login (HTTP 200).
+
+    Carries the Supabase-issued session tokens plus the caller's app identity.
+    Role and permissions are intentionally NOT included here — the client obtains
+    them from GET /auth/me, which loads them from the app DB (D-043).
+    """
+
+    access_token: str = Field(..., description="Supabase-issued JWT access token.")
+    refresh_token: str = Field(..., description="Supabase refresh token for renewing the session.")
+    token_type: str = Field(default="bearer", description="Token type (always 'bearer').")
+    expires_in: int = Field(..., description="Access-token lifetime in seconds.")
+    expires_at: int | None = Field(
+        default=None, description="Access-token expiry as a Unix epoch timestamp, if provided."
+    )
+    user_id: int = Field(..., description="APP_USER primary key of the authenticated user.")
+    supabase_uuid: str = Field(..., description="Supabase user UUID (matches the JWT sub claim).")

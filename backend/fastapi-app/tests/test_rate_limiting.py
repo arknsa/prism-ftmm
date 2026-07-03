@@ -87,3 +87,40 @@ class TestImportRateLimitDependency:
             import_rate_limit(request)
         except HTTPException as exc:
             assert exc.status_code == 429
+
+
+class TestLoginRateLimitDependency:
+    """Verify the login limiter raises 429 once its per-IP window is exhausted (H1)."""
+
+    def test_raises_429_when_limit_exceeded(self) -> None:
+        from unittest.mock import MagicMock
+
+        from app.rate_limiting import _LOGIN_IP_MAX_CALLS, login_rate_limit
+
+        unique_host = f"203.0.{uuid.uuid4().int % 256}.{uuid.uuid4().int % 256}"
+        request = MagicMock()
+        request.client.host = unique_host
+
+        for _ in range(_LOGIN_IP_MAX_CALLS):
+            login_rate_limit(request)
+
+        with pytest.raises(HTTPException) as exc_info:
+            login_rate_limit(request)
+
+        assert exc_info.value.status_code == 429
+
+    def test_independent_hosts_have_separate_quota(self) -> None:
+        from unittest.mock import MagicMock
+
+        from app.rate_limiting import _LOGIN_IP_MAX_CALLS, login_rate_limit
+
+        host_a = f"203.0.{uuid.uuid4().int % 256}.10"
+        host_b = f"203.0.{uuid.uuid4().int % 256}.20"
+        req_a, req_b = MagicMock(), MagicMock()
+        req_a.client.host = host_a
+        req_b.client.host = host_b
+
+        for _ in range(_LOGIN_IP_MAX_CALLS):
+            login_rate_limit(req_a)
+        # host_a exhausted; host_b still has full quota → no raise
+        login_rate_limit(req_b)

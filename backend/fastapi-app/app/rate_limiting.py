@@ -46,3 +46,42 @@ def import_rate_limit(request: Request) -> None:
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Rate limit exceeded: max 10 file uploads per minute.",
         )
+
+
+# ---------------------------------------------------------------------------
+# Login limiter (H1) — per-IP defense-in-depth for POST /auth/login.
+#
+# This is a gateway-side guard against brute-force / credential-stuffing from a
+# single source IP. Per-account throttling is additionally enforced by Supabase
+# Auth itself, which the login flow reaches via the ANON key (the service-role
+# key previously used bypassed that server-side limiting).
+# ---------------------------------------------------------------------------
+
+_LOGIN_IP_WINDOW_SECONDS: int = 60
+_LOGIN_IP_MAX_CALLS: int = 10
+
+_login_ip_window: dict[str, list[float]] = defaultdict(list)
+
+
+def _login_ip_within_limit(key: str) -> bool:
+    """Return True if the source IP is within the login sliding-window limit."""
+    now = time.monotonic()
+    cutoff = now - _LOGIN_IP_WINDOW_SECONDS
+    with _lock:
+        timestamps = [t for t in _login_ip_window[key] if t > cutoff]
+        if len(timestamps) >= _LOGIN_IP_MAX_CALLS:
+            _login_ip_window[key] = timestamps
+            return False
+        timestamps.append(now)
+        _login_ip_window[key] = timestamps
+        return True
+
+
+def login_rate_limit(request: Request) -> None:
+    """FastAPI dependency — raises HTTP 429 after 10 login attempts per minute per IP."""
+    key = request.client.host if request.client else "anon"
+    if not _login_ip_within_limit(key):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts. Please wait a minute and try again.",
+        )

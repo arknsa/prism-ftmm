@@ -39,6 +39,10 @@ class Settings(BaseSettings):
 
     # --- Supabase (consumed from Phase 2 onward; declared now so env is complete) ---
     supabase_url: str | None = Field(default=None, alias="SUPABASE_URL")
+    # Anon (publishable) key — used for the user-facing login flow (password grant),
+    # which keeps Supabase's built-in auth rate limiting in effect.
+    supabase_anon_key: str | None = Field(default=None, alias="SUPABASE_ANON_KEY")
+    # Service-role key — privileged; used only for admin operations (user provisioning/ban).
     supabase_service_role_key: str | None = Field(default=None, alias="SUPABASE_SERVICE_ROLE_KEY")
     supabase_jwt_secret: str | None = Field(default=None, alias="SUPABASE_JWT_SECRET")
 
