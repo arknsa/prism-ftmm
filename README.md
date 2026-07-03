@@ -1,155 +1,258 @@
 <p align="center">
-  <img src="docs/assets/banner.png" width="100%">
+  <img src="docs/assets/banner.png" width="100%" alt="PRISM Banner">
 </p>
 
-<h1 align="center">
-PRISM
-</h1>
+<h1 align="center">PRISM</h1>
 
 <p align="center">
-
-Professional Relationship Intelligence & Statistics Manager
-
+<b>Professional Relationship Intelligence & Statistics Manager</b>
 </p>
 
 <p align="center">
-
-Modern Alumni Intelligence Platform
-
+Modern Alumni Intelligence Platform for Higher Education
 </p>
 
 <p align="center">
 
-FastAPI • Next.js • PostgreSQL • Supabase
+![Python](https://img.shields.io/badge/Python-3.12-blue?style=for-the-badge&logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.116-success?style=for-the-badge&logo=fastapi)
+![Next.js](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=nextdotjs)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue?style=for-the-badge&logo=postgresql)
+![Supabase](https://img.shields.io/badge/Supabase-Backend-3ECF8E?style=for-the-badge&logo=supabase)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)
+![MIT License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 </p>
+
+---
 
 # PRISM
 
-> **Professional Relationship Intelligence & Statistics Manager**
+**PRISM (Professional Relationship Intelligence & Statistics Manager)** is a full-stack Alumni Intelligence Platform designed for higher education institutions.
 
-A modern Alumni Intelligence Platform for higher education institutions that transforms fragmented alumni records into a single source of truth through deterministic ETL, snapshot-based analytics, and interactive executive dashboards.
+Instead of functioning as an operational alumni management system, PRISM focuses on transforming fragmented alumni records into a **single source of truth** through deterministic ETL, snapshot-based analytics, and interactive executive dashboards.
 
-Built as a portfolio-grade full-stack application using FastAPI, Next.js, PostgreSQL, and Supabase.
+The platform enables universities to understand:
+
+- Where alumni work
+- Which companies hire graduates
+- Career progression & seniority
+- Industry distribution
+- Geographic distribution
+- Graduate outcomes by study program
+- Historical changes using quarterly snapshots
+
+Built as a **portfolio-grade enterprise application** using FastAPI, Next.js, PostgreSQL, and Supabase.
 
 ---
 
-## Features
+# Why PRISM?
 
-### Analytics
+Traditional alumni databases primarily store information.
 
-- Executive dashboard with alumni KPIs
-- Career outcomes by study program
-- Company and employer analytics
-- Industry & sector distribution
-- Geographic distribution
-- Graduation year trends
-- Snapshot comparison (Quarterly)
+PRISM goes beyond storage by providing a complete analytics workflow:
 
-### Data Curation
+- Deterministic data curation
+- Snapshot-based reporting
+- Interactive executive dashboards
+- Quarterly alumni refresh workflow
+- Role-based access control
+- Complete audit logging
 
-- CSV/XLSX import
-- Deterministic validation pipeline
-- Company normalization
-- Role normalization
-- Seniority classification
-- Two-stage deduplication
-- Quarterly snapshot commit
-- Validation workflow
-- Full audit logging
+The platform is designed specifically for institutional analytics and strategic decision making.
 
-### Security
+---
+
+# Features
+
+## Analytics
+
+- Executive KPI Dashboard
+- Alumni Overview
+- Career Outcomes
+- Top Employers
+- Industry Analytics
+- Sector Distribution
+- Geographic Analytics
+- Graduation Trends
+- Alumni Directory
+- Alumni Detail Page
+- Snapshot Comparison
+- Global Filtering
+
+---
+
+## Data Curation
+
+PRISM provides a deterministic ETL pipeline.
+
+Features include:
+
+- CSV Import
+- XLSX Import
+- Data Validation
+- Program Validation
+- Company Normalization
+- Role Normalization
+- Seniority Classification
+- Duplicate Detection
+- Quarterly Snapshot Commit
+- Validation Workflow
+- Audit Logging
+
+---
+
+## Security
+
+Authentication
 
 - Supabase Authentication
+- JWT Verification
+
+Authorization
+
 - Database-driven RBAC
-- JWT verification
-- Permission-based API authorization
+- Permission-based APIs
+
+Roles
+
+- Administrator
+- Data Curator
+- Faculty Viewer
+- Read Only
 
 ---
 
-## Tech Stack
+# Architecture
 
-### Backend
+```
+                    CSV / XLSX
+                         │
+                         ▼
+               Import Pipeline
+                         │
+                         ▼
+             Validation Engine
+                         │
+                         ▼
+          Company Normalization
+                         │
+                         ▼
+           Role Classification
+                         │
+                         ▼
+         Deterministic Deduplication
+                         │
+                         ▼
+          Quarterly Snapshot Engine
+                         │
+                         ▼
+               PostgreSQL Database
+                         │
+        ┌────────────────┴────────────────┐
+        ▼                                 ▼
+ Analytics API                    Curator API
+        │
+        ▼
+   Next.js Dashboard
+```
+
+---
+
+# Tech Stack
+
+## Backend
 
 - FastAPI
-- SQLAlchemy
+- SQLAlchemy 2.0
 - Alembic
 - PostgreSQL
 - Supabase
+- Pydantic v2
+- PyJWT
 
-### Frontend
+---
 
-- Next.js
+## Frontend
+
+- Next.js 16
 - TypeScript
-- TailwindCSS
+- Tailwind CSS
 - shadcn/ui
 - Apache ECharts
+- React Hook Form
 
-### Infrastructure
+---
+
+## Infrastructure
 
 - Railway
 - Vercel
+- Supabase
 - GitHub Actions
 
 ---
 
-## Project Structure
+# Screenshots
+
+> Screenshots will be added after production deployment.
+
+| Dashboard | Directory |
+|-----------|-----------|
+| Coming Soon | Coming Soon |
+
+| Companies | Career |
+|-----------|---------|
+| Coming Soon | Coming Soon |
+
+| Geography | Import Pipeline |
+|-----------|----------------|
+| Coming Soon | Coming Soon |
+
+---
+
+# Project Structure
 
 ```
 prism/
+│
 ├── backend/
 │   └── fastapi-app/
+│       ├── app/
+│       ├── migrations/
+│       ├── tests/
+│       └── README.md
+│
 ├── frontend/
 │   └── nextjs-app/
+│       ├── app/
+│       ├── components/
+│       ├── hooks/
+│       ├── lib/
+│       └── README.md
+│
 ├── database/
+│   ├── migrations/
+│   └── schema/
+│
 ├── docs/
+│   ├── architecture/
+│   ├── decisions/
+│   └── assets/
+│
+├── data/
+│   └── synthetic/
+│
 ├── scripts/
+│
 └── README.md
 ```
 
 ---
 
-## Architecture
+# Local Development
 
-```
-                 CSV / XLSX
-                      │
-                      ▼
-             Import Pipeline
-                      │
-          Validation & Normalization
-                      │
-               Deduplication
-                      │
-            Snapshot Generation
-                      │
-                PostgreSQL
-                      │
-          FastAPI Analytics API
-                      │
-              Next.js Dashboard
-```
-
----
-
-## Requirements
-
-### Backend
-
-- Python 3.12+
-- PostgreSQL
-- uv
-
-### Frontend
-
-- Node.js 22+
-- pnpm
-
----
-
-## Local Development
-
-### Backend
+## Backend
 
 ```bash
 cd backend/fastapi-app
@@ -161,7 +264,21 @@ cp .env.example .env
 uv run uvicorn app.main:app --reload
 ```
 
-### Frontend
+Backend
+
+```
+http://localhost:8000
+```
+
+Swagger
+
+```
+http://localhost:8000/docs
+```
+
+---
+
+## Frontend
 
 ```bash
 cd frontend/nextjs-app
@@ -173,20 +290,43 @@ cp .env.example .env.local
 pnpm dev
 ```
 
----
+Frontend
 
-## Deployment
-
-| Component | Platform |
-|----------|----------|
-| Frontend | Vercel |
-| Backend | Railway |
-| Database | Supabase |
-| Authentication | Supabase Auth |
+```
+http://localhost:3000
+```
 
 ---
 
-## Testing
+# Environment Variables
+
+Backend
+
+```env
+DATABASE_URL=
+
+SUPABASE_URL=
+
+SUPABASE_ANON_KEY=
+
+SUPABASE_SERVICE_ROLE_KEY=
+
+JWT_SECRET=
+```
+
+Frontend
+
+```env
+NEXT_PUBLIC_API_URL=
+
+NEXT_PUBLIC_SUPABASE_URL=
+
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```
+
+---
+
+# Testing
 
 Backend
 
@@ -204,7 +344,38 @@ Frontend
 
 ---
 
-## Project Status
+# Deployment
+
+| Component | Platform |
+|-----------|----------|
+| Frontend | Vercel |
+| Backend | Railway |
+| Database | Supabase |
+| Authentication | Supabase Auth |
+
+---
+
+# Documentation
+
+Architecture documentation is available inside:
+
+```
+docs/
+```
+
+Includes:
+
+- Architecture
+- ER Diagram
+- Roadmap
+- Engineering Decisions
+- Production Readiness
+- Curator Runbook
+- Deployment Guide
+
+---
+
+# Project Status
 
 Current Status
 
@@ -212,27 +383,64 @@ Current Status
 
 Current Phase
 
-Phase 7 — Production Deployment
+**Phase 7 — Production Deployment**
+
+Quality Gates
+
+✅ Ruff
+
+✅ Black
+
+✅ MyPy Strict
+
+✅ Pytest
+
+✅ ESLint
+
+✅ TypeScript
+
+✅ Next.js Build
 
 ---
 
-## Roadmap
+# Roadmap
 
 - [x] Foundations
-- [x] Database Schema
+- [x] Database Design
 - [x] Authentication
-- [x] RBAC
+- [x] Authorization (RBAC)
 - [x] Import Pipeline
-- [x] Validation
+- [x] Validation Workflow
+- [x] Company Normalization
+- [x] Role Classification
 - [x] Deduplication
-- [x] Snapshot Analytics
-- [x] Dashboard
+- [x] Snapshot Engine
+- [x] Analytics API
+- [x] Dashboard UI
 - [x] Documentation
 - [ ] Production Deployment
 - [ ] Live Demo
 
 ---
 
-## License
+# License
 
-MIT
+MIT License
+
+---
+
+# Author
+
+**Arkan Syafiq At'taqy**
+
+Bachelor of Science in Data Science Technology
+
+Universitas Airlangga
+
+Portfolio
+
+> https://arknsa.vercel.app
+
+GitHub
+
+> https://github.com/arknsa

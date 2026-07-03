@@ -1,50 +1,110 @@
-# ---------- OS / editor ----------
+# =====================================================
+# OS / Editor
+# =====================================================
+
 .DS_Store
 Thumbs.db
 *.swp
+*.swo
+
 .idea/
+
 .vscode/*
 !.vscode/extensions.json
 
-# ---------- Secrets / env ----------
+# =====================================================
+# Environment / Secrets
+# =====================================================
+
 .env
 .env.*
 !.env.example
 *.local
 
-# ---------- Python (backend) ----------
+backend/fastapi-app/.env
+backend/fastapi-app/.env.*
+frontend/nextjs-app/.env.local
+frontend/nextjs-app/.env.*
+
+# =====================================================
+# Python
+# =====================================================
+
 __pycache__/
 *.py[cod]
 *.egg-info/
 .eggs/
+
 build/
 dist/
+
 .venv/
 venv/
 env/
+
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+
 .coverage
+coverage.xml
 htmlcov/
+
 *.cover
 
-# ---------- Node / Next.js (frontend) ----------
+# =====================================================
+# Node
+# =====================================================
+
 node_modules/
+
 .next/
 out/
+
 .turbo/
+
 .pnpm-store/
+
+*.tsbuildinfo
+
+next-env.d.ts
+
 npm-debug.log*
 pnpm-debug.log*
 yarn-error.log*
-*.tsbuildinfo
-next-env.d.ts
 
-# ---------- Build / deploy ----------
+# =====================================================
+# Deployment
+# =====================================================
+
 .vercel/
 .railway/
 
-# ---------- Misc ----------
+# =====================================================
+# Temporary
+# =====================================================
+
 *.log
-coverage/
+
+tmp/
+temp/
+
+# =====================================================
+# Python notebooks
+# =====================================================
+
+.ipynb_checkpoints/
+
+# =====================================================
+# Generated documentation
+# =====================================================
+
+docs/assets/generated/
+
+# =====================================================
+# Claude internal reports (optional)
+# =====================================================
+
+docs/development/
+
+archive/
