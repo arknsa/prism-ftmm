@@ -58,3 +58,7 @@ exclude = ["migrations/"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+pythonpath = ["."]
+markers = [
+    "integration: real-PostgreSQL integration tests (require TEST_DATABASE_URL; skipped otherwise)",
+]
