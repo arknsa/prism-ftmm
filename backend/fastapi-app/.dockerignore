@@ -1,0 +1,15 @@
+# Keep the build context small and never bake local state / secrets into the image.
+.venv
+.env
+.env.*
+!.env.example
+.mypy_cache
+.pytest_cache
+.ruff_cache
+__pycache__
+*.pyc
+tests
+.git
+.gitignore
+README.md
+railway.toml

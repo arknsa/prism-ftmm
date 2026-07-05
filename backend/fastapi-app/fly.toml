@@ -1,0 +1,53 @@
+# Fly.io deployment configuration — FTMM Alumni Intelligence Dashboard backend.
+# Target: Fly.io Machines, production only. Deployment config only (no app changes).
+#
+# Deploy from this directory (backend/fastapi-app) so Fly builds with the local
+# Dockerfile and this fly.toml. Non-secret env lives in [env]; secrets are set out
+# of band with `fly secrets set` (see the deployment sequence in the docs).
+
+app = "ftmm-alumni-backend"
+primary_region = "sin"   # Singapore — lowest latency to the Supabase project / SE-Asia users.
+
+[build]
+  # Empty: Fly builds the Dockerfile in this directory. No Nixpacks, no buildpacks.
+  dockerfile = "Dockerfile"
+
+[deploy]
+  # Run Alembic BEFORE any new Machine serves traffic. Fly spins up a temporary
+  # Machine from the just-built image (with [env] + secrets attached) and runs this;
+  # if it exits non-zero the release is aborted and the current version keeps serving.
+  release_command = "alembic upgrade head"
+  # Rolling: replace Machines one at a time so there is no full-downtime window.
+  strategy = "rolling"
+
+# Non-secret configuration (safe to commit). App fails fast at boot in production if
+# DATABASE_URL or SUPABASE_URL is missing (app.main._validate_production_config).
+[env]
+  APP_ENV = "production"                 # disables /docs + /openapi.json; enables boot-time config validation.
+  LOG_LEVEL = "WARNING"                  # single-line JSON logs on stdout.
+  SUPABASE_URL = "https://bbzlvlmfejivuviwlair.supabase.co"  # public; used to fetch JWKS (ES256) + issuer check.
+  BACKEND_CORS_ORIGINS = "https://<project>.vercel.app"      # public; exact Vercel origin, no trailing slash.
+
+# Single public HTTPS service. Fly terminates TLS at the edge and forwards to
+# internal_port; uvicorn listens on 8000 (matches the Dockerfile CMD / EXPOSE).
+[http_service]
+  internal_port = 8000
+  force_https = true            # redirect http -> https at the edge.
+  auto_stop_machines = "stop"   # scale-to-zero when idle to save cost...
+  auto_start_machines = true    # ...and cold-start on the next request.
+  min_machines_running = 1      # keep 1 warm so /health + first request stay fast.
+
+  # Application health check: Fly polls GET /health and only routes traffic to a
+  # Machine once it returns 200. grace_period covers image pull + uvicorn startup.
+  [[http_service.checks]]
+    method = "GET"
+    path = "/health"
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "30s"
+
+# Machine size. shared-cpu-1x / 512MB is ample for this I/O-bound FastAPI app;
+# raise memory if bulk imports (openpyxl streaming) need more headroom.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
