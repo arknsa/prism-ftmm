@@ -24,6 +24,8 @@ import logging
 
 import jwt
 from fastapi import Depends, Header, HTTPException, status
+from jwt import PyJWKClient
+from jwt.exceptions import PyJWKClientError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -34,25 +36,41 @@ from app.schemas.auth import AuthenticatedUser, TokenClaims
 
 logger = logging.getLogger(__name__)
 
-# Supabase issues HS256 tokens signed with the project JWT secret.
-_ALGORITHM = "HS256"
+# Supabase signs project JWTs with an asymmetric key (ES256); tokens are verified
+# against the project's published JWKS. Algorithms are pinned to ES256 to prevent
+# algorithm-confusion attacks (never verify HS256 using a JWKS public key).
+_ALGORITHMS = ["ES256"]
+_JWKS_PATH = "/auth/v1/.well-known/jwks.json"
+
+# One PyJWKClient per JWKS URL, cached; the client caches the fetched keys itself.
+_jwk_clients: dict[str, PyJWKClient] = {}
+
+
+def _get_jwk_client(jwks_url: str) -> PyJWKClient:
+    client = _jwk_clients.get(jwks_url)
+    if client is None:
+        client = PyJWKClient(jwks_url, cache_keys=True)
+        _jwk_clients[jwks_url] = client
+    return client
 
 
 def verify_jwt(
     authorization: str = Header(..., alias="Authorization"),
 ) -> TokenClaims:
-    """Validate a Supabase-issued JWT and return its decoded claims.
+    """Validate a Supabase-issued ES256 JWT and return its decoded claims.
 
-    Expects the standard ``Authorization: Bearer <token>`` header.
-    Raises HTTP 401 for any failure: missing header, malformed token,
-    invalid signature, or expired token.
+    Verifies the signature against the project's JWKS (asymmetric public keys),
+    pinning the algorithm to ES256, validating the issuer and expiry, and — to
+    preserve prior behavior — ignoring the audience. Fails closed: any signature,
+    key, issuer, or expiry problem raises HTTP 401; an unconfigured SUPABASE_URL
+    raises HTTP 503.
 
     The JWT ``role`` claim (e.g. "authenticated") is captured for logging
     only — it is NEVER used for authorization (D-043).
     """
     settings = get_settings()
 
-    if not settings.supabase_jwt_secret:
+    if not settings.supabase_url:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication service is not configured.",
@@ -66,14 +84,19 @@ def verify_jwt(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    base_url = settings.supabase_url.rstrip("/")
+    jwks_url = f"{base_url}{_JWKS_PATH}"
+    issuer = f"{base_url}/auth/v1"
+
     try:
+        signing_key = _get_jwk_client(jwks_url).get_signing_key_from_jwt(token)
         payload: dict[str, object] = jwt.decode(
             token,
-            settings.supabase_jwt_secret,
-            algorithms=[_ALGORITHM],
-            # Supabase JWTs include aud="authenticated". We do not validate audience
-            # because the secret is already project-scoped and FastAPI does not have
-            # a fixed audience identifier to assert against.
+            signing_key.key,
+            algorithms=_ALGORITHMS,
+            issuer=issuer,
+            # Supabase JWTs include aud="authenticated". We preserve the prior
+            # behavior of not asserting a fixed audience.
             options={"verify_aud": False},
         )
     except jwt.ExpiredSignatureError as exc:
@@ -82,7 +105,7 @@ def verify_jwt(
             detail="Token has expired.",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
-    except jwt.InvalidTokenError as exc:
+    except (jwt.InvalidTokenError, PyJWKClientError) as exc:
         logger.debug("JWT validation failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

@@ -30,7 +30,7 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 from app.config import get_settings
 from app.db import _normalize_url
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import Engine, create_engine, inspect, text
 from sqlalchemy.engine import URL, make_url
 
 _APP_ROOT = Path(__file__).resolve().parents[2]
@@ -165,6 +165,21 @@ def migration_harness() -> Iterator[MigrationHarness]:
     """Yield a MigrationHarness bound to a fresh, empty ephemeral database."""
     with _ephemeral_database() as url:
         yield MigrationHarness(url)
+
+
+@pytest.fixture()
+def engine(migration_harness: MigrationHarness) -> Iterator[Engine]:
+    """A fresh ephemeral database migrated to head, exposed as an Engine.
+
+    Shared by the row-level integration test files (constraints, RBAC, …) so each
+    does not redefine it. Behavior is identical to the original per-file fixture.
+    """
+    migration_harness.upgrade("head")
+    eng = create_engine(migration_harness.url)
+    try:
+        yield eng
+    finally:
+        eng.dispose()
 
 
 @pytest.fixture(scope="session")

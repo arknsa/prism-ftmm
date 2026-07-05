@@ -13,6 +13,8 @@ Decisions: D-032, D-036, D-043.
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 from unittest.mock import MagicMock, create_autospec, patch
 
@@ -21,6 +23,7 @@ import pytest
 from app.dependencies.auth import get_current_user, verify_jwt
 from app.models.security import AppUser, Role
 from app.schemas.auth import AuthenticatedUser, TokenClaims
+from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -28,29 +31,54 @@ from sqlalchemy.orm import Session
 # Shared test fixtures
 # ---------------------------------------------------------------------------
 
-_TEST_SECRET = "test-secret-minimum-32-chars-long!!"
 _TEST_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+_TEST_SUPABASE_URL = "https://testproject.supabase.co"
+_TEST_ISSUER = f"{_TEST_SUPABASE_URL}/auth/v1"
+
+# ES256 keypair used to sign test tokens; verify_jwt receives the public key via a
+# patched JWKS client (no network). A second key models a wrong/foreign signer.
+_PRIVATE_KEY = ec.generate_private_key(ec.SECP256R1())
+_PUBLIC_KEY = _PRIVATE_KEY.public_key()
+_OTHER_PRIVATE_KEY = ec.generate_private_key(ec.SECP256R1())
 
 
 def _make_token(
-    sub: str = _TEST_UUID,
+    sub: str | None = _TEST_UUID,
     exp_offset: int = 3600,
-    secret: str = _TEST_SECRET,
-    extra: dict[str, Any] | None = None,
+    private_key: ec.EllipticCurvePrivateKey = _PRIVATE_KEY,
+    issuer: str = _TEST_ISSUER,
+    include_role: bool = True,
 ) -> str:
-    """Build a signed JWT for testing."""
-    payload: dict[str, Any] = {
-        "sub": sub,
-        "exp": int(time.time()) + exp_offset,
-        "role": "authenticated",
-    }
-    if extra:
-        payload.update(extra)
-    return jwt.encode(payload, secret, algorithm="HS256")
+    """Build an ES256-signed JWT for testing."""
+    payload: dict[str, Any] = {"exp": int(time.time()) + exp_offset, "iss": issuer}
+    if sub is not None:
+        payload["sub"] = sub
+    if include_role:
+        payload["role"] = "authenticated"
+    return jwt.encode(payload, private_key, algorithm="ES256", headers={"kid": "test-kid"})
 
 
 def _bearer(token: str) -> str:
     return f"Bearer {token}"
+
+
+@contextmanager
+def _patched_verify(
+    supabase_url: str | None = _TEST_SUPABASE_URL,
+    signing_key: object = _PUBLIC_KEY,
+) -> Iterator[None]:
+    """Patch settings.supabase_url and the JWKS client used by verify_jwt.
+
+    The JWKS client is mocked to return ``signing_key`` for any token, so no
+    network access occurs; the real ES256 signature check still runs in jwt.decode.
+    """
+    with (
+        patch("app.dependencies.auth.get_settings") as mock_settings,
+        patch("app.dependencies.auth._get_jwk_client") as mock_client,
+    ):
+        mock_settings.return_value.supabase_url = supabase_url
+        mock_client.return_value.get_signing_key_from_jwt.return_value.key = signing_key
+        yield
 
 
 def _mock_session() -> MagicMock:
@@ -90,10 +118,9 @@ def _make_app_user(
 
 
 def test_verify_jwt_returns_token_claims() -> None:
-    """Valid token → TokenClaims with correct sub and exp."""
+    """Valid ES256 token → TokenClaims with correct sub and exp."""
     token = _make_token()
-    with patch("app.dependencies.auth.get_settings") as mock_settings:
-        mock_settings.return_value.supabase_jwt_secret = _TEST_SECRET
+    with _patched_verify():
         claims = verify_jwt(_bearer(token))
 
     assert isinstance(claims, TokenClaims)
@@ -103,8 +130,7 @@ def test_verify_jwt_returns_token_claims() -> None:
 def test_verify_jwt_captures_role_claim_for_logging() -> None:
     """JWT role claim is captured into TokenClaims.role (for logging only)."""
     token = _make_token()
-    with patch("app.dependencies.auth.get_settings") as mock_settings:
-        mock_settings.return_value.supabase_jwt_secret = _TEST_SECRET
+    with _patched_verify():
         claims = verify_jwt(_bearer(token))
 
     assert claims.role == "authenticated"
@@ -112,13 +138,8 @@ def test_verify_jwt_captures_role_claim_for_logging() -> None:
 
 def test_verify_jwt_role_claim_is_none_when_absent() -> None:
     """JWT without a role claim produces TokenClaims.role = None."""
-    payload: dict[str, Any] = {
-        "sub": _TEST_UUID,
-        "exp": int(time.time()) + 3600,
-    }
-    token = jwt.encode(payload, _TEST_SECRET, algorithm="HS256")
-    with patch("app.dependencies.auth.get_settings") as mock_settings:
-        mock_settings.return_value.supabase_jwt_secret = _TEST_SECRET
+    token = _make_token(include_role=False)
+    with _patched_verify():
         claims = verify_jwt(_bearer(token))
 
     assert claims.role is None
@@ -129,44 +150,36 @@ def test_verify_jwt_role_claim_is_none_when_absent() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_verify_jwt_raises_401_when_service_unconfigured() -> None:
-    """Missing SUPABASE_JWT_SECRET → HTTP 503 (service misconfigured)."""
+def test_verify_jwt_raises_503_when_service_unconfigured() -> None:
+    """Missing SUPABASE_URL → HTTP 503 (service misconfigured)."""
     token = _make_token()
-    with patch("app.dependencies.auth.get_settings") as mock_settings:
-        mock_settings.return_value.supabase_jwt_secret = None
-        with pytest.raises(HTTPException) as exc_info:
-            verify_jwt(_bearer(token))
+    with _patched_verify(supabase_url=None), pytest.raises(HTTPException) as exc_info:
+        verify_jwt(_bearer(token))
 
     assert exc_info.value.status_code == 503
 
 
 def test_verify_jwt_raises_401_for_missing_bearer_scheme() -> None:
     """Authorization header without 'Bearer' scheme → HTTP 401."""
-    with patch("app.dependencies.auth.get_settings") as mock_settings:
-        mock_settings.return_value.supabase_jwt_secret = _TEST_SECRET
-        with pytest.raises(HTTPException) as exc_info:
-            verify_jwt("Token sometoken")
+    with _patched_verify(), pytest.raises(HTTPException) as exc_info:
+        verify_jwt("Token sometoken")
 
     assert exc_info.value.status_code == 401
 
 
 def test_verify_jwt_raises_401_for_empty_token() -> None:
     """'Bearer ' with no token → HTTP 401."""
-    with patch("app.dependencies.auth.get_settings") as mock_settings:
-        mock_settings.return_value.supabase_jwt_secret = _TEST_SECRET
-        with pytest.raises(HTTPException) as exc_info:
-            verify_jwt("Bearer ")
+    with _patched_verify(), pytest.raises(HTTPException) as exc_info:
+        verify_jwt("Bearer ")
 
     assert exc_info.value.status_code == 401
 
 
-def test_verify_jwt_raises_401_for_wrong_secret() -> None:
-    """Token signed with a different secret → HTTP 401."""
-    token = _make_token(secret="wrong-secret-also-32-chars-long!!")
-    with patch("app.dependencies.auth.get_settings") as mock_settings:
-        mock_settings.return_value.supabase_jwt_secret = _TEST_SECRET
-        with pytest.raises(HTTPException) as exc_info:
-            verify_jwt(_bearer(token))
+def test_verify_jwt_raises_401_for_wrong_signing_key() -> None:
+    """Token signed by a key other than the JWKS public key → HTTP 401."""
+    token = _make_token(private_key=_OTHER_PRIVATE_KEY)
+    with _patched_verify(), pytest.raises(HTTPException) as exc_info:
+        verify_jwt(_bearer(token))
 
     assert exc_info.value.status_code == 401
 
@@ -174,32 +187,34 @@ def test_verify_jwt_raises_401_for_wrong_secret() -> None:
 def test_verify_jwt_raises_401_for_expired_token() -> None:
     """Expired token (exp in the past) → HTTP 401."""
     token = _make_token(exp_offset=-10)
-    with patch("app.dependencies.auth.get_settings") as mock_settings:
-        mock_settings.return_value.supabase_jwt_secret = _TEST_SECRET
-        with pytest.raises(HTTPException) as exc_info:
-            verify_jwt(_bearer(token))
+    with _patched_verify(), pytest.raises(HTTPException) as exc_info:
+        verify_jwt(_bearer(token))
+
+    assert exc_info.value.status_code == 401
+
+
+def test_verify_jwt_raises_401_for_wrong_issuer() -> None:
+    """Token whose 'iss' does not match the project issuer → HTTP 401."""
+    token = _make_token(issuer="https://evil.supabase.co/auth/v1")
+    with _patched_verify(), pytest.raises(HTTPException) as exc_info:
+        verify_jwt(_bearer(token))
 
     assert exc_info.value.status_code == 401
 
 
 def test_verify_jwt_raises_401_for_malformed_token() -> None:
     """Gibberish string → HTTP 401."""
-    with patch("app.dependencies.auth.get_settings") as mock_settings:
-        mock_settings.return_value.supabase_jwt_secret = _TEST_SECRET
-        with pytest.raises(HTTPException) as exc_info:
-            verify_jwt("Bearer not.a.jwt")
+    with _patched_verify(), pytest.raises(HTTPException) as exc_info:
+        verify_jwt("Bearer not.a.jwt")
 
     assert exc_info.value.status_code == 401
 
 
 def test_verify_jwt_raises_401_for_missing_sub_claim() -> None:
     """Token without 'sub' claim → HTTP 401 (missing required claim)."""
-    payload: dict[str, Any] = {"exp": int(time.time()) + 3600, "role": "authenticated"}
-    token = jwt.encode(payload, _TEST_SECRET, algorithm="HS256")
-    with patch("app.dependencies.auth.get_settings") as mock_settings:
-        mock_settings.return_value.supabase_jwt_secret = _TEST_SECRET
-        with pytest.raises(HTTPException) as exc_info:
-            verify_jwt(_bearer(token))
+    token = _make_token(sub=None)
+    with _patched_verify(), pytest.raises(HTTPException) as exc_info:
+        verify_jwt(_bearer(token))
 
     assert exc_info.value.status_code == 401
 

@@ -2,9 +2,12 @@
 builder = "nixpacks"
 
 [deploy]
-# Run migrations then start the server. Alembic reads DATABASE_URL from env.
+# Run Alembic migrations, then start the server. Alembic reads DATABASE_URL from
+# env; the app additionally requires SUPABASE_URL (JWKS auth) and BACKEND_CORS_ORIGINS
+# at boot in production (validated by app.main._validate_production_config).
 startCommand = "uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+# Allow for migrate-on-boot + cold start before the first successful health check.
+healthcheckTimeout = 120
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3

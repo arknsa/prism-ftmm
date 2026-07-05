@@ -14,6 +14,8 @@ Routers registered per phase:
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -30,6 +32,36 @@ from app.api.users import router as users_router
 from app.config import Settings, get_settings
 from app.logging import configure_logging, get_logger
 
+# Configuration that must be present when APP_ENV=production. Missing values fail
+# fast at startup instead of surfacing later as opaque 500/503s.
+_REQUIRED_IN_PRODUCTION: tuple[str, ...] = ("database_url", "supabase_url")
+_RECOMMENDED_IN_PRODUCTION: tuple[str, ...] = (
+    "supabase_service_role_key",
+    "supabase_anon_key",
+)
+
+
+def _validate_production_config(settings: Settings, logger: logging.Logger) -> None:
+    """Fail fast on missing critical production configuration (deployment safety).
+
+    Runs only when APP_ENV=production, so local and test boots are unaffected.
+    Does not change any application behavior — it only guards startup.
+    """
+    missing = [name.upper() for name in _REQUIRED_IN_PRODUCTION if not getattr(settings, name)]
+    if missing:
+        raise RuntimeError("Missing required production configuration: " + ", ".join(missing))
+    if not settings.backend_cors_origins:
+        logger.warning(
+            "BACKEND_CORS_ORIGINS is empty in production; browser requests from the "
+            "frontend will be blocked by CORS."
+        )
+    for name in _RECOMMENDED_IN_PRODUCTION:
+        if not getattr(settings, name):
+            logger.warning(
+                "%s is not set; admin / user-provisioning endpoints will return 503.",
+                name.upper(),
+            )
+
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build and configure the FastAPI application."""
@@ -37,6 +69,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     configure_logging(level=settings.log_level)
     logger = get_logger(__name__)
+
+    if settings.is_production:
+        _validate_production_config(settings, logger)
 
     # Disable interactive docs in production — the full schema is still exported
     # offline via `uv run python -c "import app.main; ..."` for tooling consumers.

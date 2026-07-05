@@ -136,12 +136,14 @@ def seed(database_url: str) -> None:
     engine = create_engine(normalize_db_url(database_url), future=True)
     with engine.begin() as conn:
         # 1. Roles
-        role_rows = conn.execute(_INSERT_ROLE, [{"role_name": r} for r in ROLES])
-        roles_inserted = len(role_rows.fetchall())
+        roles_inserted = sum(
+            conn.execute(_INSERT_ROLE, {"role_name": r}).rowcount for r in ROLES
+        )
 
         # 2. Permissions
-        perm_rows = conn.execute(_INSERT_PERMISSION, PERMISSIONS)
-        perms_inserted = len(perm_rows.fetchall())
+        perms_inserted = sum(
+            conn.execute(_INSERT_PERMISSION, p).rowcount for p in PERMISSIONS
+        )
 
         # 3. Role-permission mappings
         mappings_inserted = 0

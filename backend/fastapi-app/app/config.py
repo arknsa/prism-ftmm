@@ -7,10 +7,10 @@ committed. See ``backend/.env.example`` for the catalogue of keys (no values).
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 AppEnv = Literal["local", "production"]
 
@@ -31,7 +31,11 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
     # --- CORS: comma-separated list of allowed origins (Vercel URL in prod) ---
-    backend_cors_origins: list[str] = Field(default_factory=list, alias="BACKEND_CORS_ORIGINS")
+    # NoDecode: hand the raw env string to _split_origins below instead of letting
+    # pydantic-settings JSON-decode it (a plain comma-separated value is not JSON).
+    backend_cors_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, alias="BACKEND_CORS_ORIGINS"
+    )
 
     # --- Database: Supabase Postgres pooler URI. Optional in Phase 0 so the app
     #     can boot without a DB; later phases require it. ---
